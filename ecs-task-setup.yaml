@@ -1,0 +1,72 @@
+Description: IAM breaker
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: "S3 bucket name to write files to"
+
+
+Resources:
+
+  # Store container log output in CloudWatch logs.
+  AWSLogs:
+    Type: "AWS::Logs::LogGroup"
+    DeletionPolicy: "Delete" # Delete logs upon stack termination
+    Properties:
+      LogGroupName: !Sub /ecs/${AWS::StackName}
+      RetentionInDays: "7"
+
+  # Permit the task to write to S3
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ecs-task-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "ecs-tasks.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+
+  IAMPolicyS3Bucket:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "S3Bucket"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: [ "s3:PutObject" ]
+            Resource: !Sub "arn:aws:s3:::${BucketName}/*"
+      Roles:
+        -
+          Ref: "ECSTaskRole"
+
+  # The TaskDefinition is where the actual configuration of the container and
+  # it's resources are defined.
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AWS::StackName}
+      NetworkMode: bridge
+      TaskRoleArn: !Ref ECSTaskRole
+      ContainerDefinitions:
+        - Name: demo-breaking-ecs-iam
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/demo-breaking-ecs-iam:latest
+          Essential: true
+          Memory: 512
+          Cpu: 1024
+          Environment:
+            - Name: 'S3_BUCKET_NAME'
+              Value: !Ref BucketName
+            - Name: 'AWS_REGION'
+              Value: !Ref AWS::Region
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /ecs/${AWS::StackName}
+              awslogs-region: !Ref AWS::Region
