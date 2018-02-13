@@ -1,3 +1,14 @@
+# Update
+
+The cause of this issue has been identified and explained at:
+https://github.com/aws/amazon-ecs-agent/issues/1231
+
+The summary is that the ECS Agent version 1.17.0 introduced rate limiting on
+the credentials endpoint used for ECS containers. This can break some poorly
+coded applications (like this demo) which is fetching the credentials
+constantly and hitting the rate limit.
+
+
 # About
 
 This project demonstrates a bug with Amazon ECS preventing the Ruby SDK from
